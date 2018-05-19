@@ -1,6 +1,7 @@
 import axios from "axios";
+import _ from "lodash";
 
-console.log('defaults:', axios.defaults);
+console.log('默认配置:', axios.defaults);
 
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -13,17 +14,35 @@ axios.interceptors.request.use(config => {
   config.headers['Authorization'] = 'whr2'
   return config
 }, error => {
+  // 什么时候会发送请求失败？
   console.log(error);
 })
 
 // 拦截响应
-axios.interceptors.response.use(data => {
-  return data
+axios.interceptors.response.use(response => {
+  response.code = 1;
+  return response
 }, error => {
-  console.log(error);
+  const { response, config } = error;
+  const { url } = config;
+  let status, message;
+  if (response && _.isPlainObject(response)) {
+    const { data, statusText } = response;
+    status = response.status;
+    message = data.message || statusText;
+  } else {
+      status = 600
+      message = error.message || 'Network Error'
+  }
+  return Promise.reject({
+    code: 0,
+    url,
+    message,
+    status,
+  })
 })
 
-console.log('interceptors:', axios.interceptors);
+console.log('拦截器:', axios.interceptors);
 
 axios.get('http://jsonplaceholder.typicode.com/users', {
   params: {
@@ -34,8 +53,8 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
   }
 })
 .then(data => {
-  // console.log(data);
+  console.log('请求成功的数据:', data);
 })
 .catch(err => {
-  // console.log(err);
+  console.log('请求失败:', err);
 })

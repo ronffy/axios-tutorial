@@ -34,7 +34,7 @@ module.exports = {
       0,
       "never"
     ],
-    "no-console": 1,
+    "no-console": 0,
     "no-extra-semi": 1,
     "no-func-assign": 1,
     "no-unreachable": 1,

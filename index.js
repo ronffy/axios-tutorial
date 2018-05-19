@@ -3,6 +3,9 @@ import _ from "lodash";
 
 console.log('默认配置:', axios.defaults);
 
+// 超时设置
+axios.defaults.timeout = 3000;
+
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 

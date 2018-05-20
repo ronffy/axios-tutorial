@@ -31,7 +31,37 @@ axios的例子及分析
 
 -   如何设置
 
+``` javascript
+
+// 设置通用header
+axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'; // xhr标识
+axios.defaults.headers.common['withCredentials'] = true; // 跨域携带cookie
+
+// 设置某种请求的header
+axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8'; // 跨域携带cookie
+
+// 设置某次请求的header
+axios.get(url, {
+  headers: {
+    'Authorization': 'whr1',
+  },
+})
+
+```
+
 -   看源码如何实现
+
+``` javascript
+
+// /lib/core/dispatchRequest.js  -  44行
+
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers || {}
+  );
+
+```
 
 
 ### 如何支持Promise
@@ -66,6 +96,7 @@ axios的例子及分析
 -   如何设置
 
 -   看源码如何实现
+
 -   如何添加超时后的处理
 
 

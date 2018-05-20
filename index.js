@@ -3,8 +3,8 @@ import _ from "lodash";
 
 console.log('默认配置:', axios.defaults);
 
-// 超时设置
-axios.defaults.timeout = 3000;
+// // 超时设置
+// axios.defaults.timeout = 3000;
 
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -17,9 +17,17 @@ axios.interceptors.request.use(config => {
   config.headers['Authorization'] = 'whr2'
   return config
 }, error => {
-  // 什么时候会发送请求失败？
+  // 提问：什么时候会提交请求失败？
   console.log(error);
 })
+
+axios.interceptors.request.use(config => new Promise(res => {
+  setTimeout(() => {
+    config.headers['Authorization'] = 'whr3'
+    res(config);
+  }, 1000);
+}), error => error)
+
 
 // 拦截响应
 axios.interceptors.response.use(response => {
@@ -47,13 +55,27 @@ axios.interceptors.response.use(response => {
 
 console.log('拦截器:', axios.interceptors);
 
+let d = +new Date();
+
+// 节流
+
 axios.get('http://jsonplaceholder.typicode.com/users', {
+// axios.get('http://localhost:3000', {
   params: {
     b: 2
   },
   headers: {
-    'Authorization': 'whr',
-  }
+    'Authorization': 'whr1',
+  },
+  cancelToken: new axios.CancelToken(cancel => {
+    let s = setInterval(() => {
+      if (+new Date() - d > 7000) {
+        clearInterval(s);
+        console.log('cancel');
+        cancel('就是想取消了');
+      }
+    }, 100);
+  })
 })
 .then(data => {
   console.log('请求成功的数据:', data);
@@ -61,3 +83,4 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
 .catch(err => {
   console.log('请求失败:', err);
 })
+

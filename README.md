@@ -18,18 +18,18 @@ axios的例子及分析
 
 ### 实现各种简便调用
 
--   如何简便使用
+#### 如何简便使用
 
 既能axios(url, option)
 又能axios(url, option)
 还能axios.get(url, option)
 
--   看源码如何实现
+#### 看源码如何实现
 
 
 ### header
 
--   如何设置
+#### 如何使用
 
 ``` javascript
 
@@ -49,7 +49,7 @@ axios.get(url, {
 
 ```
 
--   看源码如何实现
+#### 看源码如何实现
 
 ``` javascript
 
@@ -73,7 +73,7 @@ axios.get(url, {
 
 ### 如何取消请求
 
--   如何设置
+#### 如何使用
 
 ```javascript
 
@@ -96,7 +96,7 @@ source.cancel('取消日志');
 
 ```
 
--   看源码如何实现
+#### 看源码如何实现
 
 ```javascript
 
@@ -146,7 +146,7 @@ if (config.cancelToken) {
 这样当执行`cancel`方法时就可以改变实例的`promise`属性的状态为`fuiled`，
 从而执行`request.abort()`方法达到取消请求的目的
 
--   发现的问题
+##### 发现的问题
 
 1. /lib/adapters/xhr.js文件中，onCanceled方法的参数不应该叫message么，为什么叫cancel？
 
@@ -154,21 +154,48 @@ if (config.cancelToken) {
 
 
 ### 自动转换JSON数据
+
 在默认情况下，axios将会自动的将传入的data对象序列化为JSON字符串，将响应数据中的JSON字符串转换为JavaScript对象
 
--   看源码如何实现
+#### 看源码如何实现
+
+```javascript
+
+// 请求时，将data数据转换为JSON 字符串
+// /lib/defaults.js 
+transformRequest: [function transformRequest(data, headers) {
+  // ...
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+}]
+
+// 得到响应后，将请求到的数据转换为JSON对象
+// /lib/defaults.js
+transformResponse: [function transformResponse(data) {
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+}]
+
+```
 
 
 ### 如何监听进度
 
--   如何设置
+#### 如何使用
 
--   看源码如何实现
+#### 看源码如何实现
 
 
 ### 超时配置及处理
 
--   如何设置
+#### 如何使用
 
 ```javascript
 
@@ -176,7 +203,7 @@ axios.defaults.timeout = 3000;
 
 ```
 
--   看源码如何实现
+#### 看源码如何实现
 
 ```javascript
 
@@ -212,29 +239,29 @@ axios().catch(error => {
 
 ### 改写验证成功或失败的规则 validateStatus
 
--   如何设置
+#### 如何使用
 
--   看源码如何实现
+#### 看源码如何实现
 
 
 ### 如何 拦截请求、响应，并修改请求参数、修改响应数据
 
--   如何设置
+#### 如何使用
 
--   看源码如何实现
+#### 看源码如何实现
 
 
 ### 转换请求与响应数据
 
--   如何设置
+#### 如何使用
 
--   看源码如何实现
+#### 看源码如何实现
 
 -   备注：但拦截器同样可以实现该功能，且拦截器可取消某个拦截，可异步处理，可对错误进行处理等，管理起来更方便
 
 
 ### 如何支持客户端XSRF攻击防护
 
--   如何设置
+#### 如何使用
 
--   看源码如何实现
+#### 看源码如何实现

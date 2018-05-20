@@ -75,7 +75,82 @@ axios.get(url, {
 
 -   如何设置
 
+```javascript
+
+// 第一种取消方法
+axios.get(url, {
+  cancelToken: new axios.CancelToken(cancel => {
+    if (/* 取消条件 */) {
+      cancel('取消日志');
+    }
+  })
+});
+
+// 第二种取消方法
+const CancelToken = axios.CancelToken;
+const source = CancelToken.source();
+axios.get(url, {
+  cancelToken: source.token
+});
+source.cancel('取消日志');
+
+```
+
 -   看源码如何实现
+
+```javascript
+
+// /cancel/CancelToken.js  -  11行
+function CancelToken(executor) {
+  if (typeof executor !== 'function') {
+    throw new TypeError('executor must be a function.');
+  }
+
+  var resolvePromise;
+  this.promise = new Promise(function promiseExecutor(resolve) {
+    resolvePromise = resolve;
+  });
+
+  var token = this;
+  executor(function cancel(message) {
+    if (token.reason) {
+      // Cancellation has already been requested
+      return;
+    }
+
+    token.reason = new Cancel(message);
+    resolvePromise(token.reason);
+  });
+}
+
+// /lib/adapters/xhr.js  -  159行
+if (config.cancelToken) {
+    config.cancelToken.promise.then(function onCanceled(cancel) {
+        if (!request) {
+            return;
+        }
+        request.abort();
+        reject(cancel);
+        request = null;
+    });
+}
+
+```
+
+取消功能的核心是通过CancelToken内的`this.promise = new Promise(resolve => resolvePromise = resolve)`，
+得到实例属性`promise`，此时该`promise`的状态为`pending`
+通过这个属性，在`/lib/adapters/xhr.js`文件中继续给这个`promise`实例添加`.then`方法
+（`xhr.js`文件的159行`config.cancelToken.promise.then(message => request.abort())`）；
+
+在`CancelToken`外界，通过`executor`参数拿到对`cancel`方法的控制权，
+这样当执行`cancel`方法时就可以改变实例的`promise`属性的状态为`fuiled`，
+从而执行`request.abort()`方法达到取消请求的目的
+
+-   发现的问题
+
+1. /lib/adapters/xhr.js文件中，onCanceled方法的参数不应该叫message么，为什么叫cancel？
+
+2. /lib/adapters/xhr.js文件中，onCanceled方法里，reject里应该将config信息也传出来
 
 
 ### 自动转换JSON数据

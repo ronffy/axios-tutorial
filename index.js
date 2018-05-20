@@ -34,7 +34,7 @@ axios.interceptors.response.use(response => {
   response.code = 1;
   return response
 }, error => {
-  const { response, config } = error;
+  const { response, config = {} } = error;
   const { url } = config;
   let status, message;
   if (response) {
@@ -59,8 +59,8 @@ let d = +new Date();
 
 // 节流
 
-axios.get('http://jsonplaceholder.typicode.com/users', {
-// axios.get('http://localhost:3000', {
+// axios.get('http://jsonplaceholder.typicode.com/users', {
+axios.get('http://localhost:3000', {
   params: {
     b: 2
   },
@@ -69,7 +69,7 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
   },
   cancelToken: new axios.CancelToken(cancel => {
     let s = setInterval(() => {
-      if (+new Date() - d > 7000) {
+      if (+new Date() - d > 200) {
         clearInterval(s);
         console.log('cancel');
         cancel('就是想取消了');

@@ -4,7 +4,7 @@ import _ from "lodash";
 console.log('默认配置:', axios.defaults);
 
 // 超时设置
-axios.defaults.timeout = 3000;
+axios.defaults.timeout = 100;
 
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -37,7 +37,7 @@ axios.interceptors.response.use(response => {
   const { response, config } = error;
   const { url } = config;
   let status, message;
-  if (response && _.isPlainObject(response)) {
+  if (response) {
     const { data, statusText } = response;
     status = response.status;
     message = data.message || statusText;

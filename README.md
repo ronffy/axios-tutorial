@@ -95,9 +95,41 @@ axios.get(url, {
 
 -   如何设置
 
+```javascript
+
+axios.defaults.timeout = 3000;
+
+```
+
 -   看源码如何实现
 
--   如何添加超时后的处理
+```javascript
+
+// /adapters/xhr.js  -  48行
+request.timeout = config.timeout;
+
+// /adapters/xhr.js  -  94行
+request.ontimeout = function handleTimeout() {
+  reject(createError('timeout of ' + config.timeout + 'ms exceeded', 
+    config, 'ECONNABORTED', request));
+};
+
+```
+
+-   axios库外如何添加超时后的处理
+
+```javascript
+
+axios().catch(error => {
+  const { message } = error;
+  if (message.indexOf('timeout') > -1){
+    // 超时处理
+  }
+})
+
+```
+
+
 
 
 ### 请求失败的错误处理

@@ -3,20 +3,25 @@ axios的例子及分析
 
 [axios](https://github.com/axios/axios) 是一个基于 promise 的 HTTP 库，可以用在浏览器和 node.js 中
 
-## axios库的特性
+## 分析axios - 目录
+备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
 
--   从浏览器创建XMLHttpRequest
--   从node.js创建http请求
--   支持Promise API
--   拦截请求与响应
--   转换请求与响应数据
--   取消请求
+-   [axios简便调用写法](#axios简便调用写法)
+-   [header设置]()
+-   如何支持Promise的
+-   如何取消已经发送的请求
 -   自动转换JSON数据
--   支持客户端XSRF攻击防护
+-   如何监听进度
+-   超时配置及处理
+-   请求失败的错误处理
+-   改写验证成功或失败的规则 validateStatus
+-   如何 拦截请求、响应，并修改请求参数、修改响应数据
+-   转换请求与响应数据
+-   如何支持客户端XSRF攻击防护
 
 ## axios的应用和源码解析
 
-### 实现各种简便调用
+### axios简便调用写法
 
 #### 如何简便使用
 
@@ -27,7 +32,7 @@ axios的例子及分析
 #### 看源码如何实现
 
 
-### header
+### header设置
 
 #### 如何使用
 
@@ -64,14 +69,15 @@ axios.get(url, {
 ```
 
 
-### 如何支持Promise
+### 如何支持Promise的
+Promise会贯穿始终，axios是如何做到的呢？
 
 -   xhr篇
 
 -   http篇
 
 
-### 如何取消请求
+### 如何取消已经发送的请求
 
 #### 如何使用
 

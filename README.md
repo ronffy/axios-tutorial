@@ -77,16 +77,17 @@ var obj2 = {
 };
 var mergedObj = merge(obj1, obj2); 
 
-// mergedObj：
-// { 
-//   a: 2, 
-//   b: { 
-//     bb: 22, 
-//     bbb: 111 
-//   } 
-// }
-
 ```
+
+mergedObj对象是：
+`{ 
+  a: 2, 
+  b: { 
+    bb: 22, 
+    bbb: 111 
+  } 
+}`
+
 
 4. extend：将一个对象的方法和属性扩展到另外一个对象上，并指定上下文
 
@@ -112,14 +113,14 @@ var source = {
 };
 let extendObj = extend(target, source, context);
 
-// extendObj：
-// {
-//   k: 'k2',
-//   fn: source.fn.bind(context),
-// }
-执行`extendObj.fn();`, 打印`3`
-
 ```
+
+extendObj对象是：
+`{
+  k: 'k2',
+  fn: source.fn.bind(context),
+}`
+执行`extendObj.fn();`, 打印`3`
 
 
 ### axios为何会有多种使用方式

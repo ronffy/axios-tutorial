@@ -1,6 +1,10 @@
 import axios from "axios";
 import _ from "lodash";
 
+/**
+ * 阿斯顿发
+ */
+
 console.log('默认配置:', axios.defaults);
 
 // 超时设置
@@ -37,7 +41,7 @@ axios.interceptors.response.use(response => {
   const { response, config = {} } = error;
   const { url } = config;
   let status, message;
-  if (response) {
+  if (response && _.isPlainObject(response)) {
     const { data, statusText } = response;
     status = response.status;
     message = data.message || statusText;

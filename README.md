@@ -6,30 +6,213 @@ axios的例子及分析
 ## 分析axios - 目录
 备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
 
--   [axios简便调用写法](#axios简便调用写法)
+-   [工具方法简单介绍](#工具方法简单介绍)
+-   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
+-   [如何支持promise的](#如何支持promise的)
 -   [header设置](#header设置)
--   [如何支持Promise的](#如何支持Promise的)
 -   [如何取消已经发送的请求](#如何取消已经发送的请求)
--   [自动转换JSON数据](#自动转换JSON数据)
+-   [自动转换json数据](#自动转换json数据)
 -   [如何监听进度](#如何监听进度)
 -   [超时配置及处理](#超时配置及处理)
 -   [请求失败的错误处理](#请求失败的错误处理)
 -   [改写验证成功或失败的规则validatestatus](#改写验证成功或失败的规则validatestatus)
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
 -   [转换请求与响应数据](#转换请求与响应数据)
--   [如何支持客户端XSRF攻击防护](#如何支持客户端XSRF攻击防护)
+-   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
 
 ## axios的应用和源码解析
 
-### axios简便调用写法
+### 工具方法简单介绍
 
-#### 如何简便使用
+有一些方法在项目中多处使用，
+所以在正式开始看axios核心代码前，我们先来简单介绍下这些常用方法
 
-既能axios(url, option)
-又能axios(url, option)
-还能axios.get(url, option)
+特别说明：
+axios因为要兼容IE8等老版本浏览器，所以我们会看到一些为了兼容老版本浏览器而写的方法，比如`bind`、`isArray`等
 
-#### 看源码如何实现
+1. bind： 给某个函数指定上下文，也就是this指向
+
+```javascript
+
+bind(fn, context); 
+
+```
+
+实现效果同`Function.bind`方法: `fn.bind(context)`
+
+2. forEach
+
+-   如何使用
+
+```javascript
+
+var utils = require('./utils');
+var forEach = utils.forEach;
+
+// 数组
+utils.forEach([], (value, index, array) => {})
+
+// 对象
+utils.forEach({}, (value, key, object) => {})
+
+```
+
+3. merge
+
+-   如何使用
+
+```javascript
+
+var utils = require('./utils');
+var merge = utils.merge;
+
+var obj1 = {
+  a: 1,
+  b: {
+    bb: 11,
+    bbb: 111,
+  }
+};
+var obj2 = {
+  a: 2,
+  b: {
+    bb: 22,
+  }
+};
+var mergedObj = merge(obj1, obj2); 
+
+// mergedObj：
+// { 
+//   a: 2, 
+//   b: { 
+//     bb: 22, 
+//     bbb: 111 
+//   } 
+// }
+
+```
+
+4. extend
+
+-   如何使用
+
+```javascript
+
+var utils = require('./utils');
+var extend = utils.extend;
+
+
+var context = {
+  a: 4,
+};
+var source = {
+  k: 'k1',
+  fn(){
+    console.log(this.a + 1)
+  }
+};
+var target = {
+  k: 'k2',
+  fn(){
+    console.log(this.a - 1)
+  }
+};
+let extendObj = extend(source, target, context);
+
+// extendObj：
+// {
+//   k: 'k1',
+//   fn: target.fn.bind(context),
+// }
+
+```
+
+
+### axios为何会有多种使用方式
+
+#### 如何使用
+
+```javascript
+// 首先将axios包引进来
+import axios from 'axios'
+```
+
+第1种使用方式：`axios(option)`
+```javascript
+axios({
+  url,
+  method,
+  headers,
+})
+```
+
+第2种使用方式：`axios(url[, option])`
+```javascript
+axios(url, {
+  method,
+  headers,
+})
+```
+
+第3种使用方式：`axios[method](url[, option])`
+```javascript
+axios.get(url, {
+  headers,
+})
+```
+
+#### 源码分析
+
+能够实现以上多种使用方式的核心是`createInstance`方法：
+
+```javascript
+
+// /lib/axios.js  -  14行
+function createInstance(defaultConfig) {
+  // 创建一个Axios实例
+  var context = new Axios(defaultConfig);
+
+  // 此处bind方法的执行结果同Function.bind方法
+  // 所以以下代码也可以这样实现：var instance = Axios.prototype.request.bind(context);
+  // 此处作者之所以自己封装一个bind方法，推测是因为兼容性，比如IE8
+  var instance = bind(Axios.prototype.request, context);
+
+
+  utils.extend(instance, Axios.prototype, context);
+
+  utils.extend(instance, context);
+
+  return instance;
+}
+
+// 创建一个Axios实例，最终会被作为对象导出
+var axios = createInstance(defaults);
+
+/**
+ * 一般情况，项目使用默认导出的axios实例就可以满足需求了，
+ * 如果不满足需求需要创建新的axios实例，axios包也预留了接口，
+ * 看下面的代码：
+ */
+// /lib/axios.js  -  31行
+axios.Axios = Axios;
+axios.create = function create(instanceConfig) {
+  return createInstance(utils.merge(defaults, instanceConfig));
+};
+
+// ...
+
+module.exports = axios;
+
+```
+
+
+
+### 如何支持promise的
+Promise会贯穿始终，axios是如何做到的呢？
+
+-   xhr篇
+
+-   http篇
 
 
 ### header设置
@@ -54,7 +237,7 @@ axios.get(url, {
 
 ```
 
-#### 看源码如何实现
+#### 源码分析
 
 ``` javascript
 
@@ -67,14 +250,6 @@ axios.get(url, {
   );
 
 ```
-
-
-### 如何支持Promise的
-Promise会贯穿始终，axios是如何做到的呢？
-
--   xhr篇
-
--   http篇
 
 
 ### 如何取消已经发送的请求
@@ -102,7 +277,7 @@ source.cancel('取消日志');
 
 ```
 
-#### 看源码如何实现
+#### 源码分析
 
 ```javascript
 
@@ -159,11 +334,11 @@ if (config.cancelToken) {
 2. /lib/adapters/xhr.js文件中，onCanceled方法里，reject里应该将config信息也传出来
 
 
-### 自动转换JSON数据
+### 自动转换json数据
 
 在默认情况下，axios将会自动的将传入的data对象序列化为JSON字符串，将响应数据中的JSON字符串转换为JavaScript对象
 
-#### 看源码如何实现
+#### 源码分析
 
 ```javascript
 
@@ -196,7 +371,7 @@ transformResponse: [function transformResponse(data) {
 
 #### 如何使用
 
-#### 看源码如何实现
+#### 源码分析
 
 
 ### 超时配置及处理
@@ -209,7 +384,7 @@ axios.defaults.timeout = 3000;
 
 ```
 
-#### 看源码如何实现
+#### 源码分析
 
 ```javascript
 
@@ -247,27 +422,27 @@ axios().catch(error => {
 
 #### 如何使用
 
-#### 看源码如何实现
+#### 源码分析
 
 
 ### 如何拦截请求响应并修改请求参数修改响应数据
 
 #### 如何使用
 
-#### 看源码如何实现
+#### 源码分析
 
 
 ### 转换请求与响应数据
 
 #### 如何使用
 
-#### 看源码如何实现
+#### 源码分析
 
 -   备注：但拦截器同样可以实现该功能，且拦截器可取消某个拦截，可异步处理，可对错误进行处理等，管理起来更方便
 
 
-### 如何支持客户端XSRF攻击防护
+### 如何支持客户端xsrf攻击防护
 
 #### 如何使用
 
-#### 看源码如何实现
+#### 源码分析

@@ -1,11 +1,12 @@
 # axios-example
-axios的例子及分析
+axios源码分析 - xhr篇
 
 [axios](https://github.com/axios/axios) 是一个基于 promise 的 HTTP 库，可以用在浏览器和 node.js 中
 
 ## 分析axios - 目录
 备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
 
+-   [axios项目目录结构](#axios项目目录结构)
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
 -   [如何支持promise的](#如何支持promise的)
@@ -21,6 +22,9 @@ axios的例子及分析
 -   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
 
 ## axios的应用和源码解析
+
+### axios项目目录结构
+
 
 ### 工具方法简单介绍
 
@@ -149,16 +153,14 @@ axios(url, {
 })
 ```
 
-对于`get、delete`等方法
-第3种使用方式：`axios[method](url[, option])`
+第3种使用方式（对于`get、delete`等方法）：`axios[method](url[, option])`
 ```javascript
 axios.get(url, {
   headers,
 })
 ```
 
-对于`post、put`等方法
-第4种使用方式：`axios[method](url[, data[, option]])`
+第4种使用方式（对于`post、put`等方法）：`axios[method](url[, data[, option]])`
 ```javascript
 axios.get(url, {
   headers,
@@ -262,11 +264,11 @@ module.exports = axios;
 
 
 ### 如何支持promise的
-Promise会贯穿始终，axios是如何做到的呢？
+axios是通过Promise进行异步处理的？
 
--   xhr篇
+#### 如何使用
 
--   http篇
+#### 源码分析
 
 
 ### header设置
@@ -473,10 +475,83 @@ axios().catch(error => {
 
 
 ### 改写验证成功或失败的规则validatestatus
+自定义http状态码的成功、失败范围
 
 #### 如何使用
 
+```javascript
+
+axios.defaults.validateStatus = status => status >= 200 && status < 300;
+
+```
+
 #### 源码分析
+
+在默认配置中，定义了默认的http状态码验证规则，
+所以自定义validateStatus其实是对此处方法的重写
+`/lib/defaults.js`  -  77行
+
+```javascript
+
+var defaults = {
+  // ...
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  },
+  // ...
+}
+
+```
+
+`axios`是何时开始验证`http`状态码的？
+
+```javascript
+
+// /lib/adapters/xhr.js  -  20行
+var request = new XMLHttpRequest();
+var loadEvent = 'onreadystatechange';
+
+// /lib/adapters/xhr.js  -  77行
+// 每当 readyState 改变时，就会触发 onreadystatechange 事件
+request[loadEvent] = function handleLoad() {
+  if (!request || (request.readyState !== 4 && !xDomain)) {
+    return;
+  }
+  // ...省略代码
+  var response = {
+      // ...
+      // IE sends 1223 instead of 204 (https://github.com/axios/axios/issues/201)
+      status: request.status === 1223 ? 204 : request.status,
+      config: config,
+  };
+  settle(resolve, reject, response);
+  // ...省略代码
+}
+
+```
+
+/lib/core/settle.js  -  12行
+
+```javascript
+
+function settle(resolve, reject, response) {
+  // 如果我们往上捣一捣就会发现，config对象的validateStatus就是我们自定义的validateStatus方法或默认的validateStatus方法
+  var validateStatus = response.config.validateStatus;
+  // validateStatus验证通过，就会触发resolve方法
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(createError(
+      'Request failed with status code ' + response.status,
+      response.config,
+      null,
+      response.request,
+      response
+    ));
+  }
+};
+
+```
 
 
 ### 如何拦截请求响应并修改请求参数修改响应数据

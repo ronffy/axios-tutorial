@@ -40,9 +40,7 @@ bind(fn, context);
 
 实现效果同`Function.bind`方法: `fn.bind(context)`
 
-2. forEach
-
--   如何使用
+2. forEach：遍历数组或对象
 
 ```javascript
 
@@ -57,9 +55,7 @@ utils.forEach({}, (value, key, object) => {})
 
 ```
 
-3. merge
-
--   如何使用
+3. merge：深度合并多个对象为一个对象
 
 ```javascript
 
@@ -92,38 +88,36 @@ var mergedObj = merge(obj1, obj2);
 
 ```
 
-4. extend
-
--   如何使用
+4. extend：将一个对象的方法和属性扩展到另外一个对象上，并指定上下文
 
 ```javascript
 
 var utils = require('./utils');
 var extend = utils.extend;
 
-
 var context = {
   a: 4,
 };
-var source = {
+var target = {
   k: 'k1',
   fn(){
     console.log(this.a + 1)
   }
 };
-var target = {
+var source = {
   k: 'k2',
   fn(){
     console.log(this.a - 1)
   }
 };
-let extendObj = extend(source, target, context);
+let extendObj = extend(target, source, context);
 
 // extendObj：
 // {
-//   k: 'k1',
-//   fn: target.fn.bind(context),
+//   k: 'k2',
+//   fn: source.fn.bind(context),
 // }
+执行`extendObj.fn();`, 打印`3`
 
 ```
 

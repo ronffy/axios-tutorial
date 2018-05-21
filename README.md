@@ -149,6 +149,7 @@ axios(url, {
 })
 ```
 
+对于`get、delete`等方法
 第3种使用方式：`axios[method](url[, option])`
 ```javascript
 axios.get(url, {
@@ -156,9 +157,66 @@ axios.get(url, {
 })
 ```
 
+对于`post、put`等方法
+第4种使用方式：`axios[method](url[, data[, option]])`
+```javascript
+axios.get(url, {
+  headers,
+})
+```
+
+第5种使用方式：`axios.request(option)`
+```javascript
+axios.request({
+  url,
+  method,
+  headers,
+})
+```
+
 #### 源码分析
 
-能够实现以上多种使用方式的核心是`createInstance`方法：
+在开始讲axios为何有这么多种使用方式前，我们先来看下Axios构造函数
+Axios是axios包的核心，一个Axios实例就是一个axios应用，其他方法都是对Axios内容的扩展
+而Axios构造函数的核心方法是request方法，各种axios的调用方式最终都是通过request方法发xhr或http请求的，
+下面讲到axios是[如何支持promise的](#如何支持promise的)、[如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)时，会着重看这块代码。
+
+```javascript
+
+function Axios(instanceConfig) {
+  this.defaults = instanceConfig;
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+Axios.prototype.request = function request(config) {
+  // ...省略代码
+};
+
+// 为支持的请求方法提供别名
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  Axios.prototype[method] = function(url, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url
+    }));
+  };
+});
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  Axios.prototype[method] = function(url, data, config) {
+    return this.request(utils.merge(config || {}, {
+      method: method,
+      url: url,
+      data: data
+    }));
+  };
+});
+
+```
+
+能够实现多种axios使用方式的核心是`createInstance`方法：
 
 ```javascript
 
@@ -167,14 +225,18 @@ function createInstance(defaultConfig) {
   // 创建一个Axios实例
   var context = new Axios(defaultConfig);
 
-  // 此处bind方法的执行结果同Function.bind方法
-  // 所以以下代码也可以这样实现：var instance = Axios.prototype.request.bind(context);
-  // 此处作者之所以自己封装一个bind方法，推测是因为兼容性，比如IE8
+  // 不考虑老浏览器，以下代码也可以这样实现：var instance = Axios.prototype.request.bind(context);
+  // 这样instance就指向了request方法，且上下文指向context，所以可以直接以 instance(option) 方式调用 
   var instance = bind(Axios.prototype.request, context);
 
-
+  // 把Axios.prototype上的方法扩展到instance对象上，
+  // 这样 instance 就有了 get、post、put等方法
+  // 并指定上下文为context，这样执行Axios原型链上的方法时，this会指向context
   utils.extend(instance, Axios.prototype, context);
 
+  // 把context对象上的自身属性和方法扩展到instance上
+  // 注：因为extend内部使用的forEach方法对对象做for in 遍历时，只遍历对象本身的属性，而不会遍历原型链上的属性
+  // 这样，instance 就有了  defaults、interceptors 属性。（这两个属性后面我们会介绍）
   utils.extend(instance, context);
 
   return instance;
@@ -194,12 +256,9 @@ axios.create = function create(instanceConfig) {
   return createInstance(utils.merge(defaults, instanceConfig));
 };
 
-// ...
-
 module.exports = axios;
 
 ```
-
 
 
 ### 如何支持promise的

@@ -1,4 +1,4 @@
-# axios-example
+# axios-tutorial
 axios源码分析 - xhr篇
 
 [axios](https://github.com/axios/axios) 是一个基于 promise 的 HTTP 库，可以用在浏览器和 node.js 中
@@ -20,6 +20,7 @@ axios源码分析 - xhr篇
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
 -   [转换请求与响应数据](#转换请求与响应数据)
 -   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
+-   [其他的配置项](#其他的配置项)
 
 ## axios的应用和源码解析
 
@@ -68,7 +69,7 @@ bind(fn, context);
 
 ```
 
-实现效果同`Function.bind`方法: `fn.bind(context)`
+实现效果同`Function.prototype.bind`方法: `fn.bind(context)`
 
 2. forEach：遍历数组或对象
 
@@ -305,7 +306,6 @@ axios是通过Promise进行异步处理的？
 
 // 设置通用header
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'; // xhr标识
-axios.defaults.headers.common['withCredentials'] = true; // 跨域携带cookie
 
 // 设置某种请求的header
 axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8'; // 跨域携带cookie
@@ -365,22 +365,16 @@ source.cancel('取消日志');
 
 // /cancel/CancelToken.js  -  11行
 function CancelToken(executor) {
-  if (typeof executor !== 'function') {
-    throw new TypeError('executor must be a function.');
-  }
-
+ 
   var resolvePromise;
   this.promise = new Promise(function promiseExecutor(resolve) {
     resolvePromise = resolve;
   });
-
   var token = this;
   executor(function cancel(message) {
     if (token.reason) {
-      // Cancellation has already been requested
       return;
     }
-
     token.reason = new Cancel(message);
     resolvePromise(token.reason);
   });
@@ -407,7 +401,37 @@ if (config.cancelToken) {
 
 在`CancelToken`外界，通过`executor`参数拿到对`cancel`方法的控制权，
 这样当执行`cancel`方法时就可以改变实例的`promise`属性的状态为`fuiled`，
-从而执行`request.abort()`方法达到取消请求的目的
+从而执行`request.abort()`方法达到取消请求的目的。
+
+上面第二种写法可以看作是对第一种写法的完善，
+因为很多是时候我们取消请求的方法是用在本次请求方法外，
+例如，发送A、B两个请求，当B请求成功后，取消A请求。
+
+```javascript
+
+// 第1种写法：
+let source;
+axios.get(Aurl, {
+  cancelToken: new axios.CancelToken(cancel => {
+    source = cancel;
+  })
+});
+axios.get(Burl)
+.then(() => source('B请求成功了'));
+
+// 第2种写法：
+const CancelToken = axios.CancelToken;
+const source = CancelToken.source();
+axios.get(Aurl, {
+  cancelToken: source.token
+});
+axios.get(Burl)
+.then(() => source.cancel('B请求成功了'));
+
+```
+
+相对来说，我更推崇第1种写法，因为第2种写法太隐蔽了，不如第一种直观好理解。
+
 
 ##### 发现的问题
 
@@ -601,3 +625,6 @@ function settle(resolve, reject, response) {
 #### 如何使用
 
 #### 源码分析
+
+
+### 其他的配置项

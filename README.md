@@ -1,22 +1,25 @@
 # axios-tutorial
 axios源码分析 - xhr篇
 
-[axios](https://github.com/axios/axios) 是一个基于 promise 的 HTTP 库，可以用在浏览器和 node.js 中
+[axios](https://github.com/axios/axios) 是一个基于 Promise 的 HTTP 库，可以用在浏览器和node.js中，目前在github上有 41K 的star数
 
 ## 分析axios - 目录
 备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
 
 -   [axios项目目录结构](#axios项目目录结构)
+-   [名词解释](#名词解释)
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
+-   [有多少种配置config的方式](#有多少种配置config的方式)
 -   [如何支持promise的](#如何支持promise的)
 -   [header设置](#header设置)
 -   [如何取消已经发送的请求](#如何取消已经发送的请求)
 -   [自动转换json数据](#自动转换json数据)
 -   [如何监听进度](#如何监听进度)
+-   [跨域携带cookie](#跨域携带cookie)
 -   [超时配置及处理](#超时配置及处理)
--   [请求失败的错误处理](#请求失败的错误处理)
 -   [改写验证成功或失败的规则validatestatus](#改写验证成功或失败的规则validatestatus)
+-   [请求失败的错误处理](#请求失败的错误处理)
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
 -   [转换请求与响应数据](#转换请求与响应数据)
 -   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
@@ -51,6 +54,12 @@ axios源码分析 - xhr篇
 
 注：因为我们需要要看的代码都是`/lib/`目录下的文件，所以以下所有涉及到文件路径的地方，
 我们都会在`/lib/`下进行查找
+
+
+### 名词解释
+
+-   拦截器
+-   适配器
 
 
 ### 工具方法简单介绍
@@ -271,7 +280,7 @@ function createInstance(defaultConfig) {
   return instance;
 }
 
-// 创建一个Axios实例，最终会被作为对象导出
+// 接收默认配置项作为参数（后面会介绍配置项），创建一个Axios实例，最终会被作为对象导出
 var axios = createInstance(defaults);
 
 /**
@@ -298,17 +307,74 @@ axios是通过Promise进行异步处理的？
 #### 源码分析
 
 
+### 有多少种配置config的方式
+
+这里说的config，指的是贯穿整个项目的配置项对象，
+通过这个对象，可以设置：
+
+`请求适配器、请求地址、请求方法、请求头header、
+请求数据、请求或响应数据的转换、请求进度、http状态码验证规则、超时、取消请求等`
+
+可以发现，几乎axios所有的功能都是通过这个对象进行配置和传递的，
+既是axios项目内部的沟通桥梁，也是用户跟axios进行沟通的桥梁。
+那么我们就来看看，从用户开始配置config，到各个功能的生效，中间的传递流程是怎样的？
+
+用户可以通过以下3种方式定义配置项：
+
+```javascript
+
+import axios from 'axios'
+
+// 第1种
+axios.defaults[configName] = value;
+
+// 第2种
+axios({
+  url,
+  method,
+  headers,
+})
+
+// 第3种
+let newAxiosInstance = axios.create({
+  [configName]: value,
+})
+
+```
+
+
+
+
+#### 如何使用
+
+axios里，有多少种配置config的方式？
+
+```javascript
+
+import axios from 'axios'
+
+
+
+```
+
+#### 源码分析
+
+首先我们看看axios这个项目里，config都承担了哪些工作？
+
+
 ### header设置
 
 #### 如何使用
 
 ``` javascript
 
+import axios from 'axios'
+
 // 设置通用header
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'; // xhr标识
 
 // 设置某种请求的header
-axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8'; // 跨域携带cookie
+axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded;charset=utf-8';
 
 // 设置某次请求的header
 axios.get(url, {
@@ -339,6 +405,8 @@ axios.get(url, {
 #### 如何使用
 
 ```javascript
+
+import axios from 'axios'
 
 // 第一种取消方法
 axios.get(url, {
@@ -480,11 +548,34 @@ transformResponse: [function transformResponse(data) {
 #### 源码分析
 
 
+### 跨域携带cookie
+
+#### 如何使用
+
+```javascript 
+
+import axios from 'axios'
+
+axios.defaults.withCredentials = true;
+
+```
+
+#### 源码分析
+
+```javascript
+
+
+
+```
+
+
 ### 超时配置及处理
 
 #### 如何使用
 
 ```javascript
+
+import axios from 'axios'
 
 axios.defaults.timeout = 3000;
 
@@ -530,6 +621,8 @@ axios().catch(error => {
 #### 如何使用
 
 ```javascript
+
+import axios from 'axios'
 
 axios.defaults.validateStatus = status => status >= 200 && status < 300;
 

@@ -15,15 +15,12 @@ axios源码分析 - xhr篇
 -   [header设置](#header设置)
 -   [如何取消已经发送的请求](#如何取消已经发送的请求)
 -   [自动转换json数据](#自动转换json数据)
--   [如何监听进度](#如何监听进度)
 -   [跨域携带cookie](#跨域携带cookie)
 -   [超时配置及处理](#超时配置及处理)
 -   [改写验证成功或失败的规则validatestatus](#改写验证成功或失败的规则validatestatus)
--   [请求失败的错误处理](#请求失败的错误处理)
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
--   [转换请求与响应数据](#转换请求与响应数据)
+-   [数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)
 -   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
--   [其他的配置项](#其他的配置项)
 
 ## axios的应用和源码解析
 
@@ -58,7 +55,7 @@ axios源码分析 - xhr篇
 
 ### 名词解释
 
--   拦截器 interceptors
+-   拦截器 interceptors （其实就是一个构造函数）
 
     在axios项目中，每个axios实例都有一个`interceptors`实例属性，
     `interceptors`对象上有两个属性`request`、`response`,
@@ -76,14 +73,29 @@ axios源码分析 - xhr篇
     那么axios发起的每一个请求，都会在请求前，都会执行`resolveFn`函数，这就是简单的拦截器作用了，
     这里先简单说明，后面会做详细的介绍。
 
--   适配器 adapter
+-   适配器 adapter （其实就是一个方法）
 
-    在axios项目里，适配器主要指两个：xhr、http
+    在axios项目里，适配器主要指两个：xhr、http。
     xhr的核心是浏览器端的XMLHttpRequest对象，
     http核心是node的http[s].request
 
     当然，axios也留给了用户通过config自行配置适配器的接口的，
     不过，一般情况下，这两种适配器就能够满足从浏览器端向服务端发请求或者从node的http客户端向服务端发请求的需求。
+
+-   config配置项 （其实就是一个对象）
+
+    此处我们说的config，在项目内不是真的都叫config这个变量名，这个名字是我根据它的用途起的一个名字，方便大家理解。
+
+    在axios项目中的，设置\读取config时，
+    有的地方叫它`defaults`(`/lib/defaults.js`)，这儿是默认配置项，
+    有的地方叫它`config`，如`Axios.prototype.request`的参数，再如`xhrAdapter`适配器方法的参数。
+
+    config在axios项目里的是非常重要的一条链，是用户跟axios项目内部“通信”的主要桥梁。
+
+
+### 用一张图片说明axios内部的运作流程
+
+![](axios-tree.jpg)
 
 
 ### 工具方法简单介绍
@@ -438,7 +450,7 @@ Axios.prototype.request = function request(config) {
 dispatchRequest主要做了3件事：
 1，拿到config对象，对config进行传给适配器前的最后处理；
 2，adapter适配器根据config配置，发起请求
-3，adapter适配器请求完成后，如果成功则根据header、data、和config.transformResponse（关于transformResponse，下面的[转换请求与响应数据](#转换请求与响应数据)会进行讲解）拿到数据转换后的response，并return。
+3，adapter适配器请求完成后，如果成功则根据header、data、和config.transformResponse（关于transformResponse，下面的[数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)会进行讲解）拿到数据转换后的response，并return。
 
 ```javascript
 
@@ -788,13 +800,6 @@ transformResponse: [function transformResponse(data) {
 ```
 
 
-### 如何监听进度
-
-#### 如何使用
-
-#### 源码分析
-
-
 ### 跨域携带cookie
 
 #### 如何使用
@@ -809,9 +814,18 @@ axios.defaults.withCredentials = true;
 
 #### 源码分析
 
+我们在[有多少种配置config的方式](#有多少种配置config的方式)一节已经介绍了config在axios项目里的传递过程，
+由此得出，我们通过`axios.defaults.withCredentials = true`做的配置，
+在`/lib/adapters/xhr.js`里是可以取到的，然后通过以下代码配置到xhr对象项。
+
 ```javascript
 
+var request = new XMLHttpRequest();
 
+// /lib/adapters/xhr.js  -  132行
+if (config.withCredentials) {
+  request.withCredentials = true;
+}
 
 ```
 
@@ -855,11 +869,6 @@ axios().catch(error => {
 })
 
 ```
-
-
-
-
-### 请求失败的错误处理
 
 
 ### 改写验证成功或失败的规则validatestatus
@@ -955,13 +964,185 @@ function settle(resolve, reject, response) {
     用过通过
 
 
-### 转换请求与响应数据
+### 数据转换器-转换请求与响应数据
+
+数据转换器分为请求转换器和响应转换器，顾名思义：
+请求转换器(`transformRequest`)是指在请求前对数据进行转换，
+响应转换器(`transformResponse`)主要对请求响应后的响应体做数据转换。
 
 #### 如何使用
 
+1. 修改全局的转换器
+
+```javascript
+
+import axios from 'axios'
+
+// 往现有的请求转换器里增加转换方法
+axios.defaults.transformRequest.push((data, headers) => {
+  // ...处理data
+  return data;
+});
+
+// 重写请求转换器
+axios.defaults.transformRequest = [(data, headers) => {
+  // ...处理data
+  return data;
+}];
+
+// 往现有的响应转换器里增加转换方法
+axios.defaults.transformResponse.push((data, headers) => {
+  // ...处理data
+  return data;
+});
+
+// 重写响应转换器
+axios.defaults.transformResponse = [(data, headers) => {
+  // ...处理data
+  return data;
+}];
+
+```
+
+2. 修改某次axios请求的转换器
+
+```javascript
+
+import axios from 'axios'
+
+// 往已经存在的转换器里增加转换方法
+axios.get(url, {
+  // ...
+  transformRequest: [
+    ...axios.axios.defaults.transformRequest, // 去掉这行代码就等于重写请求转换器了
+    (data, headers) => {
+      // ...处理data
+      return data;
+    }
+  ],
+  transformResponse: [
+    ...axios.axios.defaults.transformResponse, // 去掉这行代码就等于重写响应转换器了
+    (data, headers) => {
+      // ...处理data
+      return data;
+    }
+  ],
+})
+
+```
+
 #### 源码分析
 
--   备注：但拦截器同样可以实现该功能，且拦截器可取消某个拦截，可异步处理，可对错误进行处理等，管理起来更方便
+默认的`defaults`配置项里已经自定义了一个请求转换器和一个响应转换器，
+看如下代码：
+
+```javascript
+
+// /lib/defaults.js
+var defaults = {
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Content-Type');
+    // ...
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+  
+};
+
+```
+
+那么在axios项目里，是在什么地方使用了转换器呢？
+
+请求转换器的使用地方是http请求前，使用请求转换器对请求数据做处理，
+然后传给adapter适配器使用。
+
+```javascript
+
+// /lib/core/dispatchRequest.js
+function dispatchRequest(config) {
+  
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  return adapter(config).then(/* ... */);
+};
+
+```
+
+看下`transformData`方法的代码，
+主要遍历转换器数组，分别执行每一个转换器，根据data和headers参数，返回新的data。
+
+```javascript
+
+// /lib/core/transformData.js
+function transformData(data, headers, fns) {
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+  return data;
+};
+
+```
+
+响应转换器的使用地方是在发起http请求后，根据adapter适配器的返回值做数据转换处理：
+
+```javascript
+
+// /lib/core/dispatchRequest.js
+return adapter(config).then(function onAdapterResolution(response) {
+    // ...
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      // ...
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+
+```
+
+#### 转换器和拦截器的关系？
+
+拦截器同样可以实现转换请求和响应数据的需求，但根据作者的设计和综合代码可以看出，
+在请求时，拦截器主要负责修改config配置项，数据转换器主要负责转换请求体，比如转换对象为字符串
+在请求响应后，拦截器可以拿到`response`，数据转换器主要负责处理响应体，比如转换字符串为对象。
 
 
 ### 如何支持客户端xsrf攻击防护
@@ -969,6 +1150,3 @@ function settle(resolve, reject, response) {
 #### 如何使用
 
 #### 源码分析
-
-
-### 其他的配置项

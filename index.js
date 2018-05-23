@@ -4,7 +4,7 @@ import _ from "lodash";
 console.log('默认配置:', axios.defaults);
 
 // 超时设置
-axios.defaults.timeout = 100;
+axios.defaults.timeout = 10000;
 
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -57,15 +57,15 @@ axios.interceptors.response.use(response => {
   })
 })
 
-axios.interceptors.response.use(response => {
-  console.log(3, 's');
+// axios.interceptors.response.use(response => {
+//   console.log(3, 's');
   
-  response.code = 1;
-  return response
-}, error => {
-  console.log(3, 'e');
+//   response.code = 1;
+//   return response
+// }, error => {
+//   console.log(3, 'e');
 
-})
+// })
 
 console.log('拦截器:', axios.interceptors);
 
@@ -73,8 +73,8 @@ let d = +new Date();
 
 // 节流
 
-// axios.get('http://jsonplaceholder.typicode.com/users', {
-axios.get('http://localhost:3000', {
+axios.get('http://jsonplaceholder.typicode.com/users', {
+// axios.get('http://localhost:3000', {
   params: {
     b: 2
   },
@@ -83,7 +83,7 @@ axios.get('http://localhost:3000', {
   },
   cancelToken: new axios.CancelToken(cancel => {
     let s = setInterval(() => {
-      if (+new Date() - d > 200) {
+      if (+new Date() - d > 20000) {
         clearInterval(s);
         console.log('cancel');
         cancel('就是想取消了');

@@ -1,10 +1,6 @@
 import axios from "axios";
 import _ from "lodash";
 
-/**
- * 阿斯顿发
- */
-
 console.log('默认配置:', axios.defaults);
 
 // 超时设置
@@ -18,6 +14,7 @@ axios.defaults.headers.common['withCredentials'] = true;
 
 // 拦截请求
 axios.interceptors.request.use(config => {
+  console.log(1)
   config.headers['Authorization'] = 'whr2'
   return config
 }, error => {
@@ -27,6 +24,7 @@ axios.interceptors.request.use(config => {
 
 axios.interceptors.request.use(config => new Promise(res => {
   setTimeout(() => {
+    console.log(2);
     config.headers['Authorization'] = 'whr3'
     res(config);
   }, 1000);
@@ -35,9 +33,11 @@ axios.interceptors.request.use(config => new Promise(res => {
 
 // 拦截响应
 axios.interceptors.response.use(response => {
+  console.log(4, 's');
   response.code = 1;
   return response
 }, error => {
+  console.log(4, 'e');
   const { response, config = {} } = error;
   const { url } = config;
   let status, message;
@@ -55,6 +55,16 @@ axios.interceptors.response.use(response => {
     message,
     status,
   })
+})
+
+axios.interceptors.response.use(response => {
+  console.log(3, 's');
+  
+  response.code = 1;
+  return response
+}, error => {
+  console.log(3, 'e');
+
 })
 
 console.log('拦截器:', axios.interceptors);

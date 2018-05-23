@@ -11,7 +11,7 @@ axios源码分析 - xhr篇
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
 -   [有多少种配置config的方式](#有多少种配置config的方式)
--   [如何支持promise的](#如何支持promise的)
+-   [axios是如何用promise搭起基于xhr的异步桥梁的](#axios是如何用promise搭起基于xhr的异步桥梁的)
 -   [header设置](#header设置)
 -   [如何取消已经发送的请求](#如何取消已经发送的请求)
 -   [自动转换json数据](#自动转换json数据)
@@ -217,7 +217,7 @@ axios.request({
 在开始讲axios为何有这么多种使用方式前，我们先来看下Axios构造函数
 Axios是axios包的核心，一个Axios实例就是一个axios应用，其他方法都是对Axios内容的扩展
 而Axios构造函数的核心方法是request方法，各种axios的调用方式最终都是通过request方法发xhr或http请求的，
-下面讲到axios是[如何支持promise的](#如何支持promise的)、[如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)时，会着重看这块代码。
+下面讲到axios是[axios是如何用promise搭起基于xhr的异步桥梁的](#axios是如何用promise搭起基于xhr的异步桥梁的)、[如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)时，会着重看这块代码。
 
 ```javascript
 
@@ -265,6 +265,7 @@ function createInstance(defaultConfig) {
 
   // 不考虑老浏览器，以下代码也可以这样实现：var instance = Axios.prototype.request.bind(context);
   // 这样instance就指向了request方法，且上下文指向context，所以可以直接以 instance(option) 方式调用 
+  // Axios.prototype.request 内对第一个参数的数据类型判断，使我们能够以 instance(url, option) 方式调用
   var instance = bind(Axios.prototype.request, context);
 
   // 把Axios.prototype上的方法扩展到instance对象上，
@@ -299,67 +300,289 @@ module.exports = axios;
 ```
 
 
-### 如何支持promise的
-axios是通过Promise进行异步处理的？
-
-#### 如何使用
-
-#### 源码分析
-
-
 ### 有多少种配置config的方式
 
-这里说的config，指的是贯穿整个项目的配置项对象，
+这里说的`config`，指的是贯穿整个项目的配置项对象，
 通过这个对象，可以设置：
 
 `请求适配器、请求地址、请求方法、请求头header、
 请求数据、请求或响应数据的转换、请求进度、http状态码验证规则、超时、取消请求等`
 
-可以发现，几乎axios所有的功能都是通过这个对象进行配置和传递的，
-既是axios项目内部的沟通桥梁，也是用户跟axios进行沟通的桥梁。
-那么我们就来看看，从用户开始配置config，到各个功能的生效，中间的传递流程是怎样的？
+可以发现，几乎`axios`所有的功能都是通过这个对象进行配置和传递的，
+既是`axios`项目内部的沟通桥梁，也是用户跟`axios`进行沟通的桥梁。
 
-用户可以通过以下3种方式定义配置项：
+首先我们看看，用户能以什么方式定义配置项？
 
 ```javascript
 
 import axios from 'axios'
 
-// 第1种
+// 第1种：直接修改Axios实例上defaults属性
 axios.defaults[configName] = value;
 
-// 第2种
+// 第2种：发起请求时最终会调用Axios.prototype.request方法，然后传入配置项
 axios({
   url,
   method,
   headers,
 })
 
-// 第3种
+// 第3种：新建一个Axios实例，传入配置项
 let newAxiosInstance = axios.create({
   [configName]: value,
 })
 
 ```
 
+看下 `Axios.prototype.request` 方法里的一行代码: (`/lib/core/Axios.js`  -  第35行)
+
+```javascript
+
+config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
+
+```
+
+可以发现此处将默认配置对象`defaults`（`/lib/defaults.js`）、Axios实例属性`this.defaults`、`request`请求的参数`config`进行了合并。
+由此得出，多处配置的优先级由低到高是：
+
+默认配置对象`defaults`（`/lib/defaults.js`)
+ ↓
+{ method: 'get' }
+ ↓
+Axios实例属性`this.defaults`
+ ↓
+`request`请求的参数`config`
+
+至此，我们已经得到了将多处`merge`后的`config`对象，那么这个对象在项目中又是怎样传递的呢？
+
+```javascript
+
+Axios.prototype.request = function request(config) {
+  // ...
+  config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
+
+  var chain = [dispatchRequest, undefined];
+  // 将config对象当作参数传给Primise.resolve方法
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    // 注：因为我们此处是在梳理config的传递过程，所以我们暂且只讨论promise的状态为rejected的情况
+    // promise第1次执行.then方法时，.then方法第一参数（也就是成功后的回调）接收到的参数是config对象
+
+    // promise的.then方法接收的第一个参数有3种情况：
+
+    // 1，this.interceptors.request.handlers 数组长度大于0时
+    // promise.then第一个会接收this.interceptors.request.handlers的最后一项的fulfilled函数作为成功回调
+    // 该回调会接收一个config对象，在这里我们可以对config进行修改
+    // 且该回调会返回一个修改后config对象（这是axios内对拦截器的约定）
+    // 然后依次取出当前项的前一项作为成功回调函数
+    // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
+
+    // 2，dispatchRequest (关于dispatchRequest的介绍，请往下移步大约25行： dispatchRequest都做了哪些事？)
+      // dispatchRequest方法会返回一个response对象
+
+    // 3，this.interceptors.response.handlers 数组长度大于0时
+    // promise.then第一个会接收this.interceptors.response.handlers的第一项的fulfilled函数作为成功回调
+    // 该回调会接收一个response对象，在这里我们可以对response对象进行修改
+    // 且该回调会返回一个修改后response对象（这是axios内对拦截器的约定）
+    // 然后依次使用当前项的后一项作为成功回调函数
+    // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
+
+    // 因为此处是用Promise进行依次链接的，
+    // 所以我们可以在拦截器里进行异步操作，而执行顺序会按照同步的方式执行
+    // 也就是 dispatchRequest 方法一定会等待所有的request拦截器执行完后再开始执行，
+    // response拦截器一定会等待 dispatchRequest 执行完后再开始执行。
+
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+```
+
+#### dispatchRequest都做了哪些事？
+
+dispatchRequest主要做了3件事：
+1，拿到config对象，对config进行传给适配器前的最后处理；
+2，adapter适配器根据config配置，发起请求
+3，adapter适配器请求完成后，如果成功则根据header、data、和config.transformResponse（关于transformResponse，下面的[转换请求与响应数据](#转换请求与响应数据)会进行讲解）拿到数据转换后的response，并return。
+
+```javascript
+
+// /lib/core/dispatchRequest.js
+module.exports = function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  // Support baseURL config
+  if (config.baseURL && !isAbsoluteURL(config.url)) {
+    config.url = combineURLs(config.baseURL, config.url);
+  }
+
+  // Ensure headers exist
+  config.headers = config.headers || {};
+
+  // 对请求data进行转换
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  // 对header进行合并处理
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers || {}
+  );
+
+  // 删除header属性里无用的属性
+  utils.forEach(
+    ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+    function cleanHeaderConfig(method) {
+      delete config.headers[method];
+    }
+  );
+
+  // 适配器会优先使用config上自定义的适配器，没有配置时才会使用默认的xhr或http适配器，不过大部分时候，axios提供的默认适配器是能够满足我们的
+  var adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+};
+
+```
+
+至此，`config`走完了它传奇的一生。`-_-`
 
 
+### axios是如何用promise搭起基于xhr的异步桥梁的
+axios是如何通过Promise进行异步处理的？
 
 #### 如何使用
-
-axios里，有多少种配置config的方式？
 
 ```javascript
 
 import axios from 'axios'
 
-
+axios.get(/**/)
+.then(data => {
+  // 此处可以拿到向服务端请求回的数据
+})
+.catch(error => {
+  // 此处可以拿到请求失败或取消或其他处理失败的错误对象
+})
 
 ```
 
 #### 源码分析
 
-首先我们看看axios这个项目里，config都承担了哪些工作？
+```javascript
+
+Axios.prototype.request = function request(config) {
+  // ...
+  var chain = [dispatchRequest, undefined];
+  // 将config对象当作参数传给Primise.resolve方法
+  var promise = Promise.resolve(config);
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+```
+
+通过[axios为何会有多种使用方式](#axios为何会有多种使用方式)我们知道，
+用户无论以什么方式调用axios，最终都是调用的`Axios.prototype.request`方法，
+这个方法最终返回的是一个Promise对象。
+
+`Axios.prototype.request`方法会调用`dispatchRequest`(`/lib/core/dispatchRequest.js`)方法，而`dispatchRequest`方法会调用`xhrAdapter`方法(`/lib/adapters/xhr.js`),
+`xhrAdapter`方法返回的是一个Promise对象。
+
+```javascript
+
+// /lib/adapters/xhr.js
+function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    // ... 省略代码
+  });
+};
+
+```
+
+`xhrAdapter`内的XHR请求成功时会执行这个Promise对象的`resolve`方法,并将请求的数据传出去,
+
+```javascript
+
+// /lib/adapters/xhr.js
+var request = new XMLHttpRequest();
+var loadEvent = 'onreadystatechange';
+
+request[loadEvent] = function handleLoad() {
+      
+  settle(resolve, reject, response);
+
+};
+
+```
+
+反之则执行`reject`方法，并将错误信息作为参数传出去。
+
+而在`dispatchRequest`方法内，首先得到`xhrAdapter`方法返回的Promise对象,
+然后通过`.then`方法，对`xhrAdapter`返回的Promise对象的成功或失败结果进行二次处理，
+成功的话，则将处理后的`response`返回，
+失败的话，则返回一个状态为`rejected`的Promise对象，
+
+```javascript
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    // ...
+    return response;
+  }, function onAdapterRejection(reason) {
+    // ...
+    return Promise.reject(reason);
+  });
+};
+
+```
+
+那么至此，用户调用`axios()`方法时，就可以直接调用Promise的`.then`或`.catch`进行业务处理了。
+
 
 
 ### header设置
@@ -468,7 +691,7 @@ if (config.cancelToken) {
 （`xhr.js`文件的159行`config.cancelToken.promise.then(message => request.abort())`）；
 
 在`CancelToken`外界，通过`executor`参数拿到对`cancel`方法的控制权，
-这样当执行`cancel`方法时就可以改变实例的`promise`属性的状态为`fuiled`，
+这样当执行`cancel`方法时就可以改变实例的`promise`属性的状态为`rejected`，
 从而执行`request.abort()`方法达到取消请求的目的。
 
 上面第二种写法可以看作是对第一种写法的完善，
@@ -616,7 +839,7 @@ axios().catch(error => {
 
 
 ### 改写验证成功或失败的规则validatestatus
-自定义http状态码的成功、失败范围
+自定义`http`状态码的成功、失败范围
 
 #### 如何使用
 

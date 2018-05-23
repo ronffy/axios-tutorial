@@ -58,8 +58,32 @@ axios源码分析 - xhr篇
 
 ### 名词解释
 
--   拦截器
--   适配器
+-   拦截器 interceptors
+
+    在axios项目中，每个axios实例都有一个`interceptors`实例属性，
+    `interceptors`对象上有两个属性`request`、`response`,
+    这两个属性都是一个`InterceptorManager`实例，而这个`InterceptorManager`构造函数就是用来管理拦截器的。
+    用过可以通过`axios.interceptors.request.use`方法添加一个拦截器，
+    比如：,
+
+    ```javascript
+
+    let resolveFn = function(config){/**/} 
+    axios.interceptors.request.use(resolveFn);
+
+    ```
+
+    那么axios发起的每一个请求，都会在请求前，都会执行`resolveFn`函数，这就是简单的拦截器作用了，
+    这里先简单说明，后面会做详细的介绍。
+
+-   适配器 adapter
+
+    在axios项目里，适配器主要指两个：xhr、http
+    xhr的核心是浏览器端的XMLHttpRequest对象，
+    http核心是node的http[s].request
+
+    当然，axios也留给了用户通过config自行配置适配器的接口的，
+    不过，一般情况下，这两种适配器就能够满足从浏览器端向服务端发请求或者从node的http客户端向服务端发请求的需求。
 
 
 ### 工具方法简单介绍
@@ -925,6 +949,10 @@ function settle(resolve, reject, response) {
 #### 如何使用
 
 #### 源码分析
+
+这个构造函数原型上有3个方法：use、eject、forEach，都是用来操作该构造函数的handlers实例属性的，
+    handlers是个数组，数组内每一项都是有两个属性的对象，两个属性分别对应成功和失败后执行的函数。
+    用过通过
 
 
 ### 转换请求与响应数据

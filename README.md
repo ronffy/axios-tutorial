@@ -8,6 +8,7 @@ axios源码分析 - XHR篇
 
 -   [axios项目目录结构](#axios项目目录结构)
 -   [名词解释](#名词解释)
+-   [axios内部的运作流程图](#axios内部的运作流程图)
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
 -   [有多少种配置config的方式](#有多少种配置config的方式)
@@ -57,6 +58,10 @@ axios源码分析 - XHR篇
 
 -   拦截器 interceptors （其实就是一个构造函数）
 
+    拦截器分为请求拦截器和响应拦截器，顾名思义：
+    请求拦截器(`interceptors.request`)是指可以拦截住每次或指定http请求，并可修改配置项
+    响应拦截器(`interceptors.response`)可以在每次http请求后拦截住每次或指定http请求，并可修改返回结果项。
+
     在axios项目中，每个axios实例都有一个`interceptors`实例属性，
     `interceptors`对象上有两个属性`request`、`response`,
     这两个属性都是一个`InterceptorManager`实例，而这个`InterceptorManager`构造函数就是用来管理拦截器的。
@@ -101,7 +106,7 @@ axios源码分析 - XHR篇
     config在axios项目里的是非常重要的一条链，是用户跟axios项目内部“通信”的主要桥梁。
 
 
-### 用一张图片说明axios内部的运作流程
+### axios内部的运作流程图
 
 ![](axios-tree.jpg)
 

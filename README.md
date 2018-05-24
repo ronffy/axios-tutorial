@@ -1,5 +1,5 @@
 # axios-tutorial
-axios源码分析 - xhr篇
+axios源码分析 - XHR篇
 
 [axios](https://github.com/axios/axios) 是一个基于 Promise 的 HTTP 库，可以用在浏览器和node.js中，目前在github上有 41K 的star数
 
@@ -33,7 +33,7 @@ axios源码分析 - xhr篇
 │ ├── /cancel/                 # 定义取消功能
 │ ├── /core/                   # 一些核心功能
 │ │ ├── Axios.js               # axios的核心主类
-│ │ ├── dispatchRequest.js     # 用来调用适配器方法发送请求
+│ │ ├── dispatchRequest.js     # 用来调用http请求适配器方法发送请求
 │ │ ├── InterceptorManager.js  # 拦截器构造函数
 │ │ └── settle.js              # 根据http响应状态，改变Promise的状态
 │ ├── /helpers/                # 一些辅助方法
@@ -73,14 +73,22 @@ axios源码分析 - xhr篇
     那么axios发起的每一个请求，都会在请求前，都会执行`resolveFn`函数，这就是简单的拦截器作用了，
     这里先简单说明，后面会做详细的介绍。
 
--   适配器 adapter （其实就是一个方法）
+-   数据转换器 （其实就是对数据进行转换，比如将对象转换为JSON字符串）
 
-    在axios项目里，适配器主要指两个：xhr、http。
-    xhr的核心是浏览器端的XMLHttpRequest对象，
-    http核心是node的http[s].request
+    数据转换器分为请求转换器和响应转换器，顾名思义：
+    请求转换器(`transformRequest`)是指在请求前对数据进行转换，
+    响应转换器(`transformResponse`)主要对请求响应后的响应体做数据转换。
+
+-   http请求适配器（其实就是一个方法）
+
+    在axios项目里，http请求适配器主要指两种：XHR、http。
+    XHR的核心是浏览器端的XMLHttpRequest对象，
+    http核心是node的http[s].request方法
 
     当然，axios也留给了用户通过config自行配置适配器的接口的，
     不过，一般情况下，这两种适配器就能够满足从浏览器端向服务端发请求或者从node的http客户端向服务端发请求的需求。
+
+    本次分享主要围绕XHR。
 
 -   config配置项 （其实就是一个对象）
 
@@ -88,7 +96,7 @@ axios源码分析 - xhr篇
 
     在axios项目中的，设置\读取config时，
     有的地方叫它`defaults`(`/lib/defaults.js`)，这儿是默认配置项，
-    有的地方叫它`config`，如`Axios.prototype.request`的参数，再如`xhrAdapter`适配器方法的参数。
+    有的地方叫它`config`，如`Axios.prototype.request`的参数，再如`xhrAdapter`http请求适配器方法的参数。
 
     config在axios项目里的是非常重要的一条链，是用户跟axios项目内部“通信”的主要桥梁。
 
@@ -341,7 +349,7 @@ module.exports = axios;
 这里说的`config`，指的是贯穿整个项目的配置项对象，
 通过这个对象，可以设置：
 
-`请求适配器、请求地址、请求方法、请求头header、
+`http请求适配器、请求地址、请求方法、请求头header、
 请求数据、请求或响应数据的转换、请求进度、http状态码验证规则、超时、取消请求等`
 
 可以发现，几乎`axios`所有的功能都是通过这个对象进行配置和传递的，
@@ -448,9 +456,9 @@ Axios.prototype.request = function request(config) {
 #### dispatchRequest都做了哪些事？
 
 dispatchRequest主要做了3件事：
-1，拿到config对象，对config进行传给适配器前的最后处理；
-2，adapter适配器根据config配置，发起请求
-3，adapter适配器请求完成后，如果成功则根据header、data、和config.transformResponse（关于transformResponse，下面的[数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)会进行讲解）拿到数据转换后的response，并return。
+1，拿到config对象，对config进行传给http请求适配器前的最后处理；
+2，http请求适配器根据config配置，发起请求
+3，http请求适配器请求完成后，如果成功则根据header、data、和config.transformResponse（关于transformResponse，下面的[数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)会进行讲解）拿到数据转换后的response，并return。
 
 ```javascript
 
@@ -488,7 +496,7 @@ module.exports = function dispatchRequest(config) {
     }
   );
 
-  // 适配器会优先使用config上自定义的适配器，没有配置时才会使用默认的xhr或http适配器，不过大部分时候，axios提供的默认适配器是能够满足我们的
+  // http请求适配器会优先使用config上自定义的适配器，没有配置时才会使用默认的XHR或http适配器，不过大部分时候，axios提供的默认适配器是能够满足我们的
   var adapter = config.adapter || defaults.adapter;
 
   return adapter(config).then(function onAdapterResolution(response) {
@@ -966,10 +974,6 @@ function settle(resolve, reject, response) {
 
 ### 数据转换器-转换请求与响应数据
 
-数据转换器分为请求转换器和响应转换器，顾名思义：
-请求转换器(`transformRequest`)是指在请求前对数据进行转换，
-响应转换器(`transformResponse`)主要对请求响应后的响应体做数据转换。
-
 #### 如何使用
 
 1. 修改全局的转换器
@@ -1074,7 +1078,7 @@ var defaults = {
 那么在axios项目里，是在什么地方使用了转换器呢？
 
 请求转换器的使用地方是http请求前，使用请求转换器对请求数据做处理，
-然后传给adapter适配器使用。
+然后传给http请求适配器使用。
 
 ```javascript
 
@@ -1107,7 +1111,7 @@ function transformData(data, headers, fns) {
 
 ```
 
-响应转换器的使用地方是在发起http请求后，根据adapter适配器的返回值做数据转换处理：
+响应转换器的使用地方是在发起http请求后，根据http请求适配器的返回值做数据转换处理：
 
 ```javascript
 

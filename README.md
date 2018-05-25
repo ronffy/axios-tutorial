@@ -1,7 +1,7 @@
 # axios-tutorial
 axios源码分析 - XHR篇
 
-[axios](https://github.com/axios/axios) 是一个基于 Promise 的 HTTP 库，可以用在浏览器和node.js中，目前在github上有 41K 的star数
+[axios](https://github.com/axios/axios) 是一个基于 Promise 的 HTTP 库，可以用在浏览器和node.js中，目前在github上有 42K 的star数
 
 ## 分析axios - 目录
 备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
@@ -21,7 +21,11 @@ axios源码分析 - XHR篇
 -   [改写验证成功或失败的规则validatestatus](#改写验证成功或失败的规则validatestatus)
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
 -   [数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)
--   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
+-   [如何支持客户端xsrf攻击防护](#如何支持客户
+
+端xsrf攻击防护)
+
+
 
 ## axios的应用和源码解析
 
@@ -62,21 +66,7 @@ axios源码分析 - XHR篇
     请求拦截器(`interceptors.request`)是指可以拦截住每次或指定http请求，并可修改配置项
     响应拦截器(`interceptors.response`)可以在每次http请求后拦截住每次或指定http请求，并可修改返回结果项。
 
-    在axios项目中，每个axios实例都有一个`interceptors`实例属性，
-    `interceptors`对象上有两个属性`request`、`response`,
-    这两个属性都是一个`InterceptorManager`实例，而这个`InterceptorManager`构造函数就是用来管理拦截器的。
-    用过可以通过`axios.interceptors.request.use`方法添加一个拦截器，
-    比如：,
-
-    ```javascript
-
-    let resolveFn = function(config){/**/} 
-    axios.interceptors.request.use(resolveFn);
-
-    ```
-
-    那么axios发起的每一个请求，都会在请求前，都会执行`resolveFn`函数，这就是简单的拦截器作用了，
-    这里先简单说明，后面会做详细的介绍。
+    这里先简单说明，后面会做详细的介绍[如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)。
 
 -   数据转换器 （其实就是对数据进行转换，比如将对象转换为JSON字符串）
 
@@ -270,6 +260,8 @@ Axios是axios包的核心，一个Axios实例就是一个axios应用，其他方
 
 ```javascript
 
+
+
 function Axios(instanceConfig) {
   this.defaults = instanceConfig;
   this.interceptors = {
@@ -435,7 +427,9 @@ Axios.prototype.request = function request(config) {
     // 然后依次取出当前项的前一项作为成功回调函数
     // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
 
-    // 2，dispatchRequest (关于dispatchRequest的介绍，请往下移步大约25行： dispatchRequest都做了哪些事？)
+    // 2，dispatchRequest (关于dispatchRequest的介绍，请往下移步大约25行
+    
+    ： dispatchRequest都做了哪些事？)
       // dispatchRequest方法会返回一个response对象
 
     // 3，this.interceptors.response.handlers 数组长度大于0时
@@ -446,6 +440,8 @@ Axios.prototype.request = function request(config) {
     // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
 
     // 因为此处是用Promise进行依次链接的，
+
+
     // 所以我们可以在拦截器里进行异步操作，而执行顺序会按照同步的方式执行
     // 也就是 dispatchRequest 方法一定会等待所有的request拦截器执行完后再开始执行，
     // response拦截器一定会等待 dispatchRequest 执行完后再开始执行。
@@ -970,11 +966,135 @@ function settle(resolve, reject, response) {
 
 #### 如何使用
 
+```javascript
+
+// 添加请求拦截器
+const myRequestInterceptor = axios.interceptors.request.use(config => {
+    // 在发送http请求之前做些什么
+    return config; // 有且必须有一个config对象被返回
+}, error => {
+    // 对请求错误做些什么
+    return Promise.reject(error);
+});
+
+// 添加响应拦截器
+axios.interceptors.response.use(response => {
+  // 对响应数据做点什么
+  return response; // 有且必须有一个response对象被返回
+}, error => {
+  // 对响应错误做点什么
+  return Promise.reject(error);
+});
+
+// 移除某次拦截器
+axios.interceptors.request.eject(myRequestInterceptor);
+
+```
+
+#### 思考
+
+```javascript
+
+axios.interceptors.request.use(config => config, error => {
+  // 是否可以直接 return error ？
+  return Promise.reject(error); 
+});
+
+```
+
 #### 源码分析
 
-这个构造函数原型上有3个方法：use、eject、forEach，都是用来操作该构造函数的handlers实例属性的，
-    handlers是个数组，数组内每一项都是有两个属性的对象，两个属性分别对应成功和失败后执行的函数。
-    用过通过
+关于拦截器，[名词解释](#名词解释)一节已经做过简单说明。
+
+每个axios实例都有一个`interceptors`实例属性，
+`interceptors`对象上有两个属性`request`、`response`。
+
+```javascript
+
+function Axios(instanceConfig) {
+  // ...
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+```
+
+这两个属性都是一个`InterceptorManager`实例，而这个`InterceptorManager`构造函数就是用来管理拦截器的。
+
+我们先来看看`InterceptorManager`构造函数：
+
+`InterceptorManager`构造函数就是用来实现拦截器的，这个构造函数原型上有3个方法：use、eject、forEach。
+关于源码，其实是比较简单的，都是用来操作该构造函数的handlers实例属性的。
+
+
+```javascript
+
+// /lib/core/InterceptorManager.js
+
+function InterceptorManager() {
+  this.handlers = []; // 存放拦截器方法，数组内每一项都是有两个属性的对象，两个属性分别对应成功和失败后执行的函数。
+}
+
+// 往拦截器里添加拦截方法
+InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+  this.handlers.push({
+    fulfilled: fulfilled,
+    rejected: rejected
+  });
+  return this.handlers.length - 1;
+};
+
+// 用来注销指定的拦截器
+InterceptorManager.prototype.eject = function eject(id) {
+  if (this.handlers[id]) {
+    this.handlers[id] = null;
+  }
+};
+
+// 遍历this.handlers，并将this.handlers里的每一项作为参数传给fn执行
+InterceptorManager.prototype.forEach = function forEach(fn) {
+  utils.forEach(this.handlers, function forEachHandler(h) {
+    if (h !== null) {
+      fn(h);
+    }
+  });
+};
+
+
+```
+
+那么当我们通过axios.interceptors.request.use添加拦截器后，
+axios内部又是怎么让这些拦截器能够在请求前、请求后拿到我们想要的数据的呢？
+
+```javascript
+
+Axios.prototype.request = function request(config) {
+  // ...
+  var chain = [dispatchRequest, undefined];
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+```
+
+核心就是promise的链式调用
+
+
 
 
 ### 数据转换器-转换请求与响应数据

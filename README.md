@@ -413,37 +413,8 @@ Axios.prototype.request = function request(config) {
   });
 
   while (chain.length) {
-    // 注：因为我们此处是在梳理config的传递过程，所以我们暂且只讨论promise的状态为rejected的情况
-    // promise第1次执行.then方法时，.then方法第一参数（也就是成功后的回调）接收到的参数是config对象
-
-    // promise的.then方法接收的第一个参数有3种情况：
-
-    // 1，this.interceptors.request.handlers 数组长度大于0时
-    // promise.then第一个会接收this.interceptors.request.handlers的最后一项的fulfilled函数作为成功回调
-    // 该回调会接收一个config对象，在这里我们可以对config进行修改
-    // 且该回调会返回一个修改后config对象（这是axios内对拦截器的约定）
-    // 然后依次取出当前项的前一项作为成功回调函数
-    // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
-
-    // 2，dispatchRequest (关于dispatchRequest的介绍，请往下移步大约25行
-    
-    ： dispatchRequest都做了哪些事？)
-      // dispatchRequest方法会返回一个response对象
-
-    // 3，this.interceptors.response.handlers 数组长度大于0时
-    // promise.then第一个会接收this.interceptors.response.handlers的第一项的fulfilled函数作为成功回调
-    // 该回调会接收一个response对象，在这里我们可以对response对象进行修改
-    // 且该回调会返回一个修改后response对象（这是axios内对拦截器的约定）
-    // 然后依次使用当前项的后一项作为成功回调函数
-    // 此处不展开介绍了，后面[如何拦截请求响应并修改请求参数修改响应数据]一节会详细对拦截器进行说明
-
-    // 因为此处是用Promise进行依次链接的，
-
-
-    // 所以我们可以在拦截器里进行异步操作，而执行顺序会按照同步的方式执行
-    // 也就是 dispatchRequest 方法一定会等待所有的request拦截器执行完后再开始执行，
-    // response拦截器一定会等待 dispatchRequest 执行完后再开始执行。
-
+    // config会按序通过 请求拦截器 - dispatchRequest方法 - 响应拦截器
+    // 关于拦截器 和 dispatchRequest方法，下面会作为一个专门的小节来介绍。
     promise = promise.then(chain.shift(), chain.shift());
   }
 
@@ -991,12 +962,25 @@ axios.interceptors.request.eject(myRequestInterceptor);
 
 #### 思考
 
+1. 是否可以直接 return error？
+
 ```javascript
 
 axios.interceptors.request.use(config => config, error => {
   // 是否可以直接 return error ？
   return Promise.reject(error); 
 });
+
+```
+
+2. 如何实现promise的链式调用
+
+```javascript
+
+new People('whr').sleep(3000).eat('apple').sleep(5000).eat('durian');
+
+// 打印结果
+// (等待3s)--> 'whr eat apple' -(等待5s)--> 'whr eat durian'
 
 ```
 
@@ -1063,16 +1047,22 @@ InterceptorManager.prototype.forEach = function forEach(fn) {
 
 ```
 
-那么当我们通过axios.interceptors.request.use添加拦截器后，
+那么当我们通过`axios.interceptors.request.use`添加拦截器后，
 axios内部又是怎么让这些拦截器能够在请求前、请求后拿到我们想要的数据的呢？
+
+先看下代码：
 
 ```javascript
 
+// /lib/core/Axios.js
 Axios.prototype.request = function request(config) {
   // ...
   var chain = [dispatchRequest, undefined];
+
+  // 初始化一个promise对象，状态微resolved，接收到的参数微config对象
   var promise = Promise.resolve(config);
 
+  // 注意：interceptor.fulfilled 或 interceptor.rejected 是可能为undefined
   this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
     chain.unshift(interceptor.fulfilled, interceptor.rejected);
   });
@@ -1081,18 +1071,40 @@ Axios.prototype.request = function request(config) {
     chain.push(interceptor.fulfilled, interceptor.rejected);
   });
 
+  // 添加了拦截器后的chain数组大概会是这样的：
+  // [
+  //   requestFulfilledFn, requestRejectedFn, ..., 
+  //   dispatchRequest, undefined,
+  //   responseFulfilledFn, responseRejectedFn, ....,
+  // ]
+
+  // 只要chain数组长度不为0，就一直执行while循环
   while (chain.length) {
+    // 数组的 shift() 方法用于把数组的第一个元素从其中删除，并返回第一个元素的值。
+    // 每次执行while循环，从chain数组里按序取出两项，并分别作为promise.then方法的第一个和第二个参数
+
+    // 按照我们使用InterceptorManager.prototype.use添加拦截器的规则，正好每次添加的就是我们通过InterceptorManager.prototype.use方法添加的成功和失败回调
+
+    // 通过InterceptorManager.prototype.use往拦截器数组里添加拦截器时使用的数组的push方法，
+    // 对于请求拦截器，从拦截器数组按序读到后是通过unshift方法往chain数组数里添加的，又通过shift方法从chain数组里取出的，所以得出结论：对于请求拦截器，先添加的拦截器会后执行
+    // 对于响应拦截器，从拦截器数组按序读到后是通过push方法往chain数组里添加的，又通过shift方法从chain数组里取出的，所以得出结论：对于响应拦截器，添加的拦截器先执行
+
+    // 第一个请求拦截器的fulfilled函数会接收到promise对象初始化时传入的config对象，而请求拦截器又规定用户写的fulfilled函数必须返回一个config对象，所以通过promise实现链式调用时，每个请求拦截器的fulfilled函数都会接收到一个config对象
+
+    // 第一个响应拦截器的fulfilled函数会接受到dispatchRequest（也就是我们的请求方法）请求到的数据（也就是response对象）,而响应拦截器又规定用户写的fulfilled函数必须返回一个response对象，所以通过promise实现链式调用时，每个响应拦截器的fulfilled函数都会接收到一个response对象
+
+    // 任何一个拦截器的抛出的错误，都会被下一个拦截器的rejected函数收到，所以dispatchRequest抛出的错误才会被响应拦截器接收到。
+
+    // 因为axios是通过promise实现的链式调用，所以我们可以在拦截器里进行异步操作，而拦截器的执行顺序还是会按照我们上面说的顺序执行，也就是 dispatchRequest 方法一定会等待所有的请求拦截器执行完后再开始执行，响应拦截器一定会等待 dispatchRequest 执行完后再开始执行。
+
     promise = promise.then(chain.shift(), chain.shift());
+
   }
 
   return promise;
 };
 
 ```
-
-核心就是promise的链式调用
-
-
 
 
 ### 数据转换器-转换请求与响应数据

@@ -11,6 +11,7 @@ axios源码分析 - XHR篇
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
 -   [有多少种配置config的方式](#有多少种配置config的方式)
+-   [dispatchRequest都做了哪些事](#dispatchRequest都做了哪些事)
 -   [axios是如何用promise搭起基于xhr的异步桥梁的](#axios是如何用promise搭起基于xhr的异步桥梁的)
 -   [header设置](#header设置)
 -   [如何取消已经发送的请求](#如何取消已经发送的请求)
@@ -363,17 +364,17 @@ axios.create = function create(instanceConfig) {
 
 import axios from 'axios'
 
-// 第1种：直接修改Axios实例上defaults属性
+// 第1种：直接修改Axios实例上defaults属性，主要用来设置通用配置
 axios.defaults[configName] = value;
 
-// 第2种：发起请求时最终会调用Axios.prototype.request方法，然后传入配置项
+// 第2种：发起请求时最终会调用Axios.prototype.request方法，然后传入配置项，主要用来设置“个例”配置
 axios({
   url,
   method,
   headers,
 })
 
-// 第3种：新建一个Axios实例，传入配置项
+// 第3种：新建一个Axios实例，传入配置项，此处设置的是通用配置
 let newAxiosInstance = axios.create({
   [configName]: value,
 })
@@ -391,13 +392,7 @@ config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
 可以发现此处将默认配置对象`defaults`（`/lib/defaults.js`）、Axios实例属性`this.defaults`、`request`请求的参数`config`进行了合并。
 由此得出，多处配置的优先级由低到高是：
 
-默认配置对象`defaults`（`/lib/defaults.js`)
- ↓
-{ method: 'get' }
- ↓
-Axios实例属性`this.defaults`
- ↓
-`request`请求的参数`config`
+默认配置对象`defaults`（`/lib/defaults.js`) ——> { method: 'get' } ——> Axios实例属性`this.defaults`  ——>  `request`请求的参数`config`
 
 至此，我们已经得到了将多处`merge`后的`config`对象，那么这个对象在项目中又是怎样传递的呢？
 
@@ -411,14 +406,8 @@ Axios.prototype.request = function request(config) {
   // 将config对象当作参数传给Primise.resolve方法
   var promise = Promise.resolve(config);
 
-  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
-    chain.unshift(interceptor.fulfilled, interceptor.rejected);
-  });
-
-  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
-    chain.push(interceptor.fulfilled, interceptor.rejected);
-  });
-
+  // ...省略代码
+  
   while (chain.length) {
     // config会按序通过 请求拦截器 - dispatchRequest方法 - 响应拦截器
     // 关于拦截器 和 dispatchRequest方法，下面会作为一个专门的小节来介绍。
@@ -430,7 +419,10 @@ Axios.prototype.request = function request(config) {
 
 ```
 
-#### dispatchRequest都做了哪些事？
+至此，`config`走完了它传奇的一生 `-_-`
+
+
+## dispatchRequest都做了哪些事？
 
 dispatchRequest主要做了3件事：
 1，拿到config对象，对config进行传给http请求适配器前的最后处理；
@@ -506,8 +498,6 @@ module.exports = function dispatchRequest(config) {
 };
 
 ```
-
-至此，`config`走完了它传奇的一生。`-_-`
 
 
 ### axios是如何用promise搭起基于xhr的异步桥梁的

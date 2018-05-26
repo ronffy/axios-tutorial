@@ -10,7 +10,7 @@ axios.defaults.timeout = 10000;
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
 // 跨域携带cookie
-axios.defaults.headers.common['withCredentials'] = true;
+axios.defaults.withCredentials = true;
 
 // 拦截请求
 axios.interceptors.request.use(config => {
@@ -78,6 +78,7 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
   params: {
     b: 2
   },
+  
   headers: {
     'Authorization': 'whr1',
   },
@@ -89,7 +90,15 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
         cancel('就是想取消了');
       }
     }, 100);
-  })
+  }),
+  transformResponse: [
+    ...axios.defaults.transformResponse,
+    (data) => {
+      // debugger
+      return data.toString();
+    }
+  ]
+  
 })
 .then(data => {
   console.log('请求成功的数据:', data);

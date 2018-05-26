@@ -1,10 +1,9 @@
 # axios-tutorial
 axios源码分析 - XHR篇
 
-[axios](https://github.com/axios/axios) 是一个基于 Promise 的 HTTP 库，可以用在浏览器和node.js中，目前在github上有 42K 的star数
+[axios](https://github.com/axios/axios) 是一个基于 Promise 的http请求库，可以用在浏览器和node.js中，目前在github上有 42K 的star数
 
 ## 分析axios - 目录
-备注：每一小节都会从两个方面介绍：如何使用 -> 源码分析
 
 -   [axios项目目录结构](#axios项目目录结构)
 -   [名词解释](#名词解释)
@@ -23,6 +22,11 @@ axios源码分析 - XHR篇
 -   [数据转换器-转换请求与响应数据](#数据转换器-转换请求与响应数据)
 -   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
 
+### 备注：
+
+1. 每一小节都会从两个方面介绍：如何使用 -> 源码分析
+2. [工具方法简单介绍]一节可先跳过，后面用到了再过来查看
+3. axios最核心的技术点是[axios是如何用promise搭起基于xhr的异步桥梁的] 和 [如何拦截请求响应并修改请求参数修改响应数据]
 
 
 ## axios的应用和源码解析
@@ -235,7 +239,7 @@ axios.get(url, {
 
 第4种使用方式（对于`post、put`等方法）：`axios[method](url[, data[, option]])`
 ```javascript
-axios.get(url, {
+axios.post(url, data, {
   headers,
 })
 ```
@@ -258,8 +262,7 @@ Axios是axios包的核心，一个Axios实例就是一个axios应用，其他方
 
 ```javascript
 
-
-
+// /lib/core/Axios.js
 function Axios(instanceConfig) {
   this.defaults = instanceConfig;
   this.interceptors = {
@@ -323,18 +326,22 @@ function createInstance(defaultConfig) {
 // 接收默认配置项作为参数（后面会介绍配置项），创建一个Axios实例，最终会被作为对象导出
 var axios = createInstance(defaults);
 
-/**
- * 一般情况，项目使用默认导出的axios实例就可以满足需求了，
- * 如果不满足需求需要创建新的axios实例，axios包也预留了接口，
- * 看下面的代码：
- */
+```
+
+以上代码看上去很绕，很多次一举，其实`createInstance`最终是希望拿到一个Function，这个Function指向`Axios.prototype.request`，这个Function还会有`Axios.prototype`上的每个方法作为静态方法，且这些方法的上下文都是指向同一个对象。
+这样我们就可以使用这种方式发起http请求了: `axios()`
+
+一般情况，项目使用默认导出的axios实例就可以满足需求了，
+如果不满足需求需要创建新的axios实例，axios包也预留了接口，
+看下面的代码：
+
+```javascript
+
 // /lib/axios.js  -  31行
 axios.Axios = Axios;
 axios.create = function create(instanceConfig) {
   return createInstance(utils.merge(defaults, instanceConfig));
 };
-
-module.exports = axios;
 
 ```
 

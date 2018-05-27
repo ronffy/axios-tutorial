@@ -163,13 +163,18 @@ var mergedObj = merge(obj1, obj2);
 ```
 
 mergedObj对象是：
-`{ 
+
+```javascript
+
+{ 
   a: 2, 
   b: { 
     bb: 22, 
     bbb: 111 
   } 
-}`
+}
+
+```
 
 
 4. extend：将一个对象的方法和属性扩展到另外一个对象上，并指定上下文
@@ -199,10 +204,15 @@ let extendObj = extend(target, source, context);
 ```
 
 extendObj对象是：
-`{
+
+```javascript
+
+{
   k: 'k2',
   fn: source.fn.bind(context),
-}`
+}
+
+```
 执行`extendObj.fn();`, 打印`3`
 
 
@@ -415,8 +425,12 @@ config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
 ```
 
 可以发现此处将默认配置对象`defaults`（`/lib/defaults.js`）、Axios实例属性`this.defaults`、`request`请求的参数`config`进行了合并。
+
 由此得出，多处配置的优先级由低到高是：
-默认配置对象`defaults`（`/lib/defaults.js`)  ——>  { method: 'get' }  ——>  Axios实例属性`this.defaults`   ——>   `request`请求的参数`config`
+—> 默认配置对象`defaults`（`/lib/defaults.js`)  
+—>  { method: 'get' }  
+—>  Axios实例属性`this.defaults`   
+—>   `request`请求的参数`config`
 
 留给大家思考一个问题: `defaults` 和 `this.defaults` 什么时候配置是相同的，什么时候是不同的？
 
@@ -890,14 +904,14 @@ import axios from 'axios'
 axios.get(url, {
   // ...
   transformRequest: [
-    ...axios.axios.defaults.transformRequest, // 去掉这行代码就等于重写请求转换器了
+    ...axios.defaults.transformRequest, // 去掉这行代码就等于重写请求转换器了
     (data, headers) => {
       // ...处理data
       return data;
     }
   ],
   transformResponse: [
-    ...axios.axios.defaults.transformResponse, // 去掉这行代码就等于重写响应转换器了
+    ...axios.defaults.transformResponse, // 去掉这行代码就等于重写响应转换器了
     (data, headers) => {
       // ...处理data
       return data;
@@ -1363,4 +1377,4 @@ function settle(resolve, reject, response) {
 
 axios这个项目里，有很多对JS使用很巧妙的地方，比如对promise的串联操作（当然你也可以说这块是借鉴很多异步中间件的处理方式）,让我们可以很方便对请求前后的各种处理方法的流程进行控制；很多实用的小优化，比如请求前后的数据处理，省了程序员一遍一遍去写JSON.xxx了；同时支持了浏览器和node两种环境，对使用node的项目来说无疑是极好的。
 
-总之，这个能够在github斩获42K（截止2018.05.27）的star，实力绝不是概的，值得好好交交心！
+总之，这个能够在github斩获42K+（截止2018.05.27）的star，实力绝不是概的，值得好好交交心！

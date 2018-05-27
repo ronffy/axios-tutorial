@@ -6,6 +6,8 @@ console.log('默认配置:', axios.defaults);
 // 超时设置
 axios.defaults.timeout = 10000;
 
+axios.defaults.validateStatus = null;
+
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
@@ -78,7 +80,7 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
   params: {
     b: 2
   },
-  
+
   headers: {
     'Authorization': 'whr1',
   },

@@ -1,12 +1,23 @@
 import axios from "axios";
 import _ from "lodash";
 
+const write = function (name, value, expires) {
+  let cookie = [];
+  cookie.push(name + '=' + encodeURIComponent(value));
+
+  if (expires) {
+    cookie.push('expires=' + new Date(expires).toGMTString());
+  }
+
+  document.cookie = cookie.join('; ');
+};
+
+write('whr', '333')
+
 console.log('默认配置:', axios.defaults);
 
 // 超时设置
 axios.defaults.timeout = 10000;
-
-axios.defaults.validateStatus = null;
 
 // 设置通用头部
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -73,8 +84,6 @@ console.log('拦截器:', axios.interceptors);
 
 let d = +new Date();
 
-// 节流
-
 axios.get('http://jsonplaceholder.typicode.com/users', {
 // axios.get('http://localhost:3000', {
   params: {
@@ -93,13 +102,13 @@ axios.get('http://jsonplaceholder.typicode.com/users', {
       }
     }, 100);
   }),
-  transformResponse: [
-    ...axios.defaults.transformResponse,
-    (data) => {
-      // debugger
-      return data.toString();
-    }
-  ]
+  // transformResponse: [
+  //   ...axios.defaults.transformResponse,
+  //   (data) => {
+  //     // debugger
+  //     return data.toString();
+  //   }
+  // ]
   
 })
 .then(data => {

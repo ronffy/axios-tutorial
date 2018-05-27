@@ -11,7 +11,7 @@ axios源码分析 - XHR篇
 -   [工具方法简单介绍](#工具方法简单介绍)
 -   [axios为何会有多种使用方式](#axios为何会有多种使用方式)
 -   [用户配置的config是怎么起作用的](#用户配置的config是怎么起作用的)
--   [Axios.prototype.request](#Axios.prototype.request)
+-   [axios.prototype.request](#axios.prototype.request)
 -   [如何拦截请求响应并修改请求参数修改响应数据](#如何拦截请求响应并修改请求参数修改响应数据)
 -   [dispatchrequest都做了哪些事](#dispatchrequest都做了哪些事)
 -   [axios是如何用promise搭起基于xhr的异步桥梁的](#axios是如何用promise搭起基于xhr的异步桥梁的)
@@ -22,7 +22,7 @@ axios源码分析 - XHR篇
 -   [跨域携带cookie](#跨域携带cookie)
 -   [超时配置及处理](#超时配置及处理)
 -   [改写验证成功或失败的规则validatestatus](#改写验证成功或失败的规则validatestatus)
--   [如何支持客户端xsrf攻击防护](#如何支持客户端xsrf攻击防护)
+-   [总结](#总结)
 
 ### 备注：
 
@@ -449,7 +449,7 @@ Axios.prototype.request = function request(config) {
 下一节就要说到重头戏了: `Axios.prototype.request`
 
 
-### Axios.prototype.request
+### axios.prototype.request
 
 这里面的代码比较复杂，一些方法需要追根溯源才能搞清楚，
 所以只需对chain数组有个简单的了解就好，涉及到的[拦截器](#如何拦截请求响应并修改请求参数修改响应数据)、[`dispatchRequest`]后面都会详细介绍
@@ -1359,8 +1359,8 @@ function settle(resolve, reject, response) {
 ```
 
 
-### 如何支持客户端xsrf攻击防护
+### 总结
 
-#### 如何使用
+axios这个项目里，有很多对JS使用很巧妙的地方，比如对promise的串联操作（当然你也可以说这块是借鉴很多异步中间件的处理方式）,让我们可以很方便对请求前后的各种处理方法的流程进行控制；很多实用的小优化，比如请求前后的数据处理，省了程序员一遍一遍去写JSON.xxx了；同时支持了浏览器和node两种环境，对使用node的项目来说无疑是极好的。
 
-#### 源码分析
+总之，这个能够在github斩获42K（截止2018.05.27）的star，实力绝不是概的，值得好好交交心！

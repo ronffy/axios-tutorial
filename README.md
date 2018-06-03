@@ -629,7 +629,7 @@ Axios.prototype.request = function request(config) {
   // ...
   var chain = [dispatchRequest, undefined];
 
-  // 初始化一个promise对象，状态微resolved，接收到的参数为config对象
+  // 初始化一个promise对象，状态为resolved，接收到的参数为config对象
   var promise = Promise.resolve(config);
 
   // 注意：interceptor.fulfilled 或 interceptor.rejected 是可能为undefined

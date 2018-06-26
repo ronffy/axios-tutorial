@@ -1,5 +1,4 @@
-# axios-tutorial
-axios源码分析 - XHR篇
+# Axios源码深度剖析 - XHR篇
 
 [axios](https://github.com/axios/axios) 是一个基于 Promise 的http请求库，可以用在浏览器和node.js中，目前在github上有 42K 的star数
 

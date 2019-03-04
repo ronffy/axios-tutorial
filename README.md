@@ -318,7 +318,7 @@ var axios = createInstance(defaults);
 
 以上代码看上去很绕，其实`createInstance`最终是希望拿到一个Function，这个Function指向`Axios.prototype.request`，这个Function还会有`Axios.prototype`上的每个方法作为静态方法，且这些方法的上下文都是指向同一个对象。
 
-那么在来看看`Axios、Axios.prototype.request`的源码是怎样的？
+那么再来看看`Axios、Axios.prototype.request`的源码是怎样的？
 
 `Axios`是axios包的核心，一个`Axios`实例就是一个axios应用，其他方法都是对`Axios`内容的扩展
 而`Axios`构造函数的核心方法是`request`方法，各种axios的调用方式最终都是通过`request`方法发请求的
